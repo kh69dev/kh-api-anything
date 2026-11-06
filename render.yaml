@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: kh-api-anything
+    runtime: docker
+    plan: starter
+    region: frankfurt
+    healthCheckPath: /v1/health
+    envVars:
+      - key: API_ANYTHING_TOKEN
+        generateValue: true
+    disk:
+      name: api-anything-data
+      mountPath: /data
+      sizeGB: 1

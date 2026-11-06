@@ -480,6 +480,17 @@ export async function serve(o: ServeOptions = {}): Promise<Served> {
       } catch {
         throw new HttpError(400, "the request target is not a valid path");
       }
+      // A client that cannot send headers (Claude's custom connectors on web and mobile) carries the
+      // token as the first path segment instead: /k/<token>/mcp. Checked in constant time, then
+      // stripped, so every route below sees the plain path.
+      let pathAuthed = false;
+      const keyed = /^\/k\/([^/]+)(\/.*)$/.exec(url.pathname);
+      if (keyed) {
+        if (!sameToken(decodeURIComponent(keyed[1]!), token)) return fail(res, 401, "wrong token");
+        pathAuthed = true;
+        url.pathname = keyed[2]!;
+        req.url = url.pathname + url.search;
+      }
       path = url.pathname;
       // a GET /mcp is the server's event stream, open as long as the client stays: not an answer to
       // wait for at shutdown, and quiet for as long as the server has nothing to say
@@ -515,7 +526,7 @@ export async function serve(o: ServeOptions = {}): Promise<Served> {
       }
       const auth = req.headers.authorization ?? "";
       const m = /^Bearer\s+(.+)$/i.exec(auth);
-      if (!m || !sameToken(m[1]!.trim(), token))
+      if (!pathAuthed && (!m || !sameToken(m[1]!.trim(), token)))
         return fail(res, 401, m ? "wrong token" : "missing Authorization: Bearer <token>", {
           "www-authenticate": "Bearer",
         });
